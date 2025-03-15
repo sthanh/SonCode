@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { Input, Button, Select, SelectItem } from '@nextui-org/react';
+import { useState, useEffect } from 'react';
+import { Input, Button, Select, SelectItem, Card, CardHeader, CardBody, CardFooter, Divider, Link as NextUILink } from '@nextui-org/react';
 
 interface Trial {
   id: string;
@@ -10,6 +10,8 @@ interface Trial {
   phase: string;
   description: string;
   url: string;
+  relevanceScore?: number;
+  relevanceExplanation?: string;
 }
 
 export default function SearchPage() {
@@ -22,6 +24,22 @@ export default function SearchPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [enhanced, setEnhanced] = useState(false);
+  const [profile, setProfile] = useState<any>(null);
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      const response = await fetch('/api/profile');
+      if (response.ok) {
+        const data = await response.json();
+        setProfile(data);
+      } else {
+        console.error('Failed to fetch profile');
+        // Handle the case where the profile cannot be fetched
+      }
+    };
+
+    fetchProfile();
+  }, []);
 
   const handleBasicSearch = async () => {
     setLoading(true);
@@ -56,7 +74,26 @@ export default function SearchPage() {
           url: `https://clinicaltrials.gov/study/${fields.identificationModule.nctId}`,
         };
       });
-      setResults(transformedData);
+      if (profile) {
+        const rankResponse = await fetch('/api/ai/rank-trial', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ profile, trials: transformedData })
+        });
+
+        if (rankResponse.ok) {
+          const rankedTrials = await rankResponse.json();
+          setResults(rankedTrials);
+        } else {
+          console.error("Failed to rank the trials")
+          setResults(transformedData)
+        }
+      } else {
+        setResults(transformedData);
+      }
+
     } catch (error: any) {
       setError(error.message);
     } finally {
@@ -118,7 +155,25 @@ export default function SearchPage() {
           url: `https://clinicaltrials.gov/study/${fields.identificationModule.nctId}`,
         };
       });
-      setResults(transformedData);
+      if (profile) {
+        const rankResponse = await fetch('/api/ai/rank-trial', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ profile, trials: transformedData })
+        });
+
+        if (rankResponse.ok) {
+          const rankedTrials = await rankResponse.json();
+          setResults(rankedTrials);
+        } else {
+          console.error("Failed to rank the trials")
+          setResults(transformedData)
+        }
+      } else {
+        setResults(transformedData)
+      }
     } catch (error: any) {
       setError(error.message);
     } finally {
@@ -160,16 +215,17 @@ export default function SearchPage() {
         <div className="space-y-4">
           <Input
             type="text"
+            label="Keywords"
             placeholder="Enter keywords (condition, medication, etc.)"
             value={keyword}
             onChange={(e) => setKeyword(e.target.value)}
             className="w-full"
           />
-          <div className="flex space-x-4">
+          <div className="flex flex-wrap gap-4">
             <Select
               label="Phase"
               placeholder="Select a phase"
-              className="w-1/3"
+              className="w-full sm:w-1/3"
               onChange={(e) => setPhase(e.target.value)}
             >
               {phases.map((phase) => (
@@ -181,7 +237,7 @@ export default function SearchPage() {
             <Select
               label="Status"
               placeholder="Select a status"
-              className="w-1/3"
+              className="w-full sm:w-1/3"
               onChange={(e) => setStatus(e.target.value)}
             >
               {statuses.map((status) => (
@@ -190,23 +246,24 @@ export default function SearchPage() {
                 </SelectItem>
               ))}
             </Select>
-          </div>
-          <div className="flex space-x-4">
             <Input
               type="text"
+              label="Location"
               placeholder="Enter location (city, state, or zip)"
               value={location}
               onChange={(e) => setLocation(e.target.value)}
-              className="w-1/2"
+              className="w-full sm:w-1/2"
             />
             <Input
               type="text"
+              label="Distance"
               placeholder="Enter distance (e.g., 50mi)"
               value={distance}
               onChange={(e) => setDistance(e.target.value)}
-              className="w-1/2"
+              className="w-full sm:w-1/2"
             />
           </div>
+
           <Button color="primary" onClick={() => handleBasicSearch()} className="w-full">
             Search
           </Button>
@@ -215,28 +272,38 @@ export default function SearchPage() {
           </Button>
 
           {/* Search Results */}
-          {loading && <p>Loading...</p>}
-          {error && <p className="text-red-500">{error}</p>}
+          {loading && <p className="text-center">Loading...</p>}
+          {error && <p className="text-red-500 text-center">{error}</p>}
           {results.length > 0 && (
-            <div className="mt-6">
-              <h2 className="text-xl font-semibold mb-4">Search Results</h2>
-              <ul>
-                {results.map((trial) => (
-                  <li key={trial.id} className="mb-4 p-4 border rounded-lg">
-                    <a
-                      href={trial.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-600 hover:underline"
-                    >
-                      <h3 className="text-lg font-semibold">{trial.title}</h3>
-                    </a>
-                    <p>Location: {trial.location}</p>
-                    <p>Phase: {trial.phase}</p>
+            <div className="mt-6 space-y-4">
+              <h2 className="text-xl font-semibold text-center">Search Results</h2>
+              {results.map((trial) => (
+                <Card key={trial.id} className="mb-4">
+                  <CardHeader className="flex gap-3">
+                    <div className="flex flex-col">
+                      <p className="text-md font-semibold">{trial.title}</p>
+                      <p className="text-small text-default-500">{trial.location}</p>
+                    </div>
+                  </CardHeader>
+                  <Divider />
+                  <CardBody>
+                    <p><span className="font-semibold">Phase:</span> {trial.phase}</p>
                     <p>{trial.description}</p>
-                  </li>
-                ))}
-              </ul>
+                    {trial.relevanceScore && (
+                      <p>Relevance Score: {trial.relevanceScore}/10</p>
+                    )}
+                    {trial.relevanceExplanation && (
+                      <p>Explanation: {trial.relevanceExplanation}</p>
+                    )}
+                  </CardBody>
+                  <Divider />
+                  <CardFooter>
+                    <NextUILink href={trial.url} target="_blank" rel="noopener noreferrer" color="primary">
+                      View on ClinicalTrials.gov
+                    </NextUILink>
+                  </CardFooter>
+                </Card>
+              ))}
             </div>
           )}
         </div>
