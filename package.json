@@ -1,0 +1,8 @@
+{
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "langchain": "^0.3.19",
+    "openai": "^4.87.3",
+    "pdf-parse": "^1.1.1"
+  }
+}
